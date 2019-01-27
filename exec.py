@@ -10,9 +10,7 @@ import sublime
 
 import Default.exec
 
-original_kill = Default.exec.AsyncProcess.kill
-original_on_finished = Default.exec.ExecCommand.on_finished
-original_update_phantoms = Default.exec.ExecCommand.update_phantoms
+from .tools.patch import *
 
 stylesheet_template = '''
 <style>
@@ -112,6 +110,7 @@ def generate_phantom(self, view, line, column, text):
     return phantom
 
 
+@patch(Default.exec.AsyncProcess)
 def kill(self):
     # when running the build process using MSYS2 and bash we can't just kill
     # the cmd.exe because this would leave most of the child processes running
@@ -161,12 +160,14 @@ def kill(self):
         original_kill(self)
 
 
-def on_finished(self, proc):
+@patch(Default.exec.ExecCommand)
+def on_finished(patch, self, proc):
     # use a timeout of 1 to wait for the process to exit
     sublime.set_timeout(lambda: self.finish(proc), 1)
 
 
-def update_phantoms(self):
+@patch(Default.exec.ExecCommand)
+def update_phantoms(patch, self):
     for file, errs in self.errs_by_file.items():
         view = self.window.find_open_file(file)
         if view:
@@ -198,14 +199,10 @@ def update_phantoms(self):
 
 
 def plugin_loaded():
-    """Overwrite the original methods."""
-    Default.exec.AsyncProcess.kill = kill
-    Default.exec.ExecCommand.on_finished = on_finished
-    Default.exec.ExecCommand.update_phantoms = update_phantoms
+    """Apply patches."""
+    apply_patches(__name__)
 
 
 def plugin_unloaded():
-    """Restore the original methods."""
-    Default.exec.AsyncProcess.kill = original_kill
-    Default.exec.ExecCommand.on_finished = original_on_finished
-    Default.exec.ExecCommand.update_phantoms = original_update_phantoms
+    """Restore patches."""
+    restore_patches(__name__)
