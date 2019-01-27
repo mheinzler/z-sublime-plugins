@@ -1,10 +1,10 @@
 """Improve the exec build command."""
 
 import html
-import textwrap
 import re
 import subprocess
 import sys
+import textwrap
 
 import sublime
 
@@ -64,6 +64,8 @@ html_template = '''
 
 
 def generate_stylesheet(self, view, line, column, text):
+    """Generate a stylesheet for a phantom."""
+
     # GCC returns the column without taking tabs into account. We need to
     # correct the column to include the tabs as Sublime Text does.
 
@@ -84,6 +86,8 @@ def generate_stylesheet(self, view, line, column, text):
 
 
 def generate_html(self, view, line, column, text):
+    """Generate the HTML for a phantom."""
+
     # detect the type of the message
     match = re.match("^(error|warning|note)", text)
     type = match.group(1) if match else "error"
@@ -98,6 +102,7 @@ def generate_html(self, view, line, column, text):
 
 
 def generate_phantom(self, view, line, column, text):
+    """Generate a phantom."""
     html = generate_html(self, view, line, column, text)
 
     # create a phantom that is shown below the line
@@ -112,6 +117,8 @@ def generate_phantom(self, view, line, column, text):
 
 @patch(Default.exec.AsyncProcess)
 def kill(self):
+    """Implement our own killing mechanism on certain platforms."""
+
     # when running the build process using MSYS2 and bash we can't just kill
     # the cmd.exe because this would leave most of the child processes running
     if sys.platform == "win32":
@@ -162,12 +169,13 @@ def kill(self):
 
 @patch(Default.exec.ExecCommand)
 def on_finished(patch, self, proc):
-    # use a timeout of 1 to wait for the process to exit
+    """Use a longer timeout to wait for the process to exit."""
     sublime.set_timeout(lambda: self.finish(proc), 1)
 
 
 @patch(Default.exec.ExecCommand)
 def update_phantoms(patch, self):
+    """Create our own phantoms."""
     for file, errs in self.errs_by_file.items():
         view = self.window.find_open_file(file)
         if view:
