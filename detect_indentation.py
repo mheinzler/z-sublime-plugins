@@ -1,20 +1,21 @@
 """Improve indentation detection."""
 
-import Default.detect_indentation
+from Default import detect_indentation
 
-original_run = Default.detect_indentation.DetectIndentationCommand.run
+from .tools.patch import *
 
 
-def run(self, edit, show_message=True, threshold=1):
+@patch(detect_indentation.DetectIndentationCommand)
+def run(patch, self, edit, show_message=True, threshold=1):
     """Call the original method with a smaller default threshold."""
-    original_run(self, edit, show_message, threshold)
+    patch.original(self, edit, show_message, threshold)
 
 
 def plugin_loaded():
-    """Overwrite the run method."""
-    Default.detect_indentation.DetectIndentationCommand.run = run
+    """Apply patches."""
+    apply_patches(__name__)
 
 
 def plugin_unloaded():
-    """Restore the original run method."""
-    Default.detect_indentation.DetectIndentationCommand.run = original_run
+    """Restore patches."""
+    restore_patches(__name__)
