@@ -1,63 +1,70 @@
 """Improve the Corona Editor plugin."""
 
+from .tools.patch import *
+
 try:
     Corona_Editor = __import__("Corona Editor")
 except ImportError:
     pass
 else:
-    class CoronaDocsCommand(Corona_Editor.corona_docs.CoronaDocsCommand):
-        """Improve the CoronaDocsCommand."""
+    @patch(Corona_Editor.corona_docs.CoronaDocsCommand)
+    def is_visible(patch, self):
+        """Show only for Lua and LuaExtended syntax."""
+        selector = "(source.lua | source.luae) - entity"
 
-        def is_visible(self):
-            """Show only for Lua and LuaExtended syntax."""
-            selector = "(source.lua | source.luae) - entity"
+        s = self.view.sel()[0]
+        return self.view.match_selector(s.a, selector)
 
-            s = self.view.sel()[0]
-            return self.view.match_selector(s.a, selector)
+    @patch(Corona_Editor.debugger.CoronaDebuggerCommand)
+    def is_enabled(patch, self):
+        """Enable for Lua and LuaExtended syntax."""
+        selector = "(source.lua | source.luae) - entity"
 
-    class CoronaDebuggerCommand(Corona_Editor.debugger.CoronaDebuggerCommand):
-        """Improve the CoronaDebuggerCommand."""
+        view = self.window.active_view()
+        if view is not None:
+            s = view.sel()[0]
+            return view.match_selector(s.a, selector)
 
-        def is_enabled(self):
-            """Enable for Lua and LuaExtended syntax."""
-            selector = "(source.lua | source.luae) - entity"
+        return False
 
-            view = self.window.active_view()
-            if view is not None:
-                s = view.sel()[0]
-                return view.match_selector(s.a, selector)
+    @patch(Corona_Editor.debugger.CoronaDebuggerCommand) # noqa
+    def is_visible(patch, self):
+        """Show only for Lua and LuaExtended syntax."""
+        selector = "source.lua | source.luae"
 
+        view = self.window.active_view()
+        if view is not None:
+            s = view.sel()[0]
+            return view.match_selector(s.a, selector)
+
+        return False
+
+    @patch(Corona_Editor.run_project.ClearOutputPanelCommand) # noqa
+    def is_enabled(patch, self):
+        """Enable only if visible to prevent clearing the panel."""
+        if not self.is_visible():
             return False
 
-        def is_visible(self):
-            """Show only for Lua and LuaExtended syntax."""
-            selector = "source.lua | source.luae"
+        return patch.original(self)
 
-            view = self.window.active_view()
-            if view is not None:
-                s = view.sel()[0]
-                return view.match_selector(s.a, selector)
+    @patch(Corona_Editor.run_project.ClearOutputPanelCommand) # noqa
+    def is_visible(patch, self):
+        """Show only for Lua and LuaExtended syntax."""
+        selector = "source.lua | source.luae"
 
-            return False
+        view = self.window.active_view()
+        if view is not None:
+            s = view.sel()[0]
+            return view.match_selector(s.a, selector)
 
-    class ClearOutputPanelCommand(
-            Corona_Editor.run_project.ClearOutputPanelCommand):
-        """Improve the ClearOutputPanelCommand."""
+        return False
 
-        def is_enabled(self):
-            """Enable only if visible to prevent clearing the panel."""
-            if not self.is_visible():
-                return False
 
-            return super().is_enabled()
+def plugin_loaded():
+    """Apply the patches."""
+    apply_patches(__name__)
 
-        def is_visible(self):
-            """Show only for Lua and LuaExtended syntax."""
-            selector = "source.lua | source.luae"
 
-            view = self.window.active_view()
-            if view is not None:
-                s = view.sel()[0]
-                return view.match_selector(s.a, selector)
-
-            return False
+def plugin_unloaded():
+    """Restore the patches."""
+    restore_patches(__name__)
