@@ -1,10 +1,10 @@
 import sublime
 import sublime_plugin
 
-from Default.comment import ToggleCommentCommand
+from Default import comment
 
 # inherit everything from the toggle_comment command but prevent it from
 # removing block comments
-class ToggleLineCommentCommand(ToggleCommentCommand):
+class ToggleLineCommentCommand(comment.ToggleCommentCommand):
 	def remove_block_comment(self, view, edit, comment_data, region):
 		return False
