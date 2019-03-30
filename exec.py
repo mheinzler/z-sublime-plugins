@@ -116,7 +116,7 @@ def generate_phantom(self, view, line, column, text):
 
 
 @patch(Default.exec.AsyncProcess)
-def kill(self):
+def kill(patch, self):
     """Implement our own killing mechanism on certain platforms."""
 
     # when running the build process using MSYS2 and bash we can't just kill
