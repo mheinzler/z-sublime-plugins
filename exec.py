@@ -115,56 +115,63 @@ def generate_phantom(self, view, line, column, text):
     return phantom
 
 
+def _get_windows_process_children(pid):
+    # run a wmic command to find the children of this process
+    wmic_command = [
+        'wmic',
+        'process',
+        'where',
+        '(ParentProcessId=%d)' % pid,
+        'get',
+        'Caption,ProcessId'
+    ]
+
+    children = subprocess.check_output(wmic_command,
+                                       shell=True,
+                                       universal_newlines=True)
+
+    # split the text output into process names and ids
+    children = [p.split() for p in children.splitlines() if p]
+
+    # skip the first row of headers
+    return children[1:]
+
+
+def _kill_msys2_process(windows_pid):
+    # call kill.exe because it allows to specify Windows process IDs
+    kill_command = [
+        'bash',
+        '-c',
+        'kill.exe -W %d' % windows_pid
+    ]
+
+    subprocess.check_output(kill_command, shell=True)
+
+
 @patch(Default.exec.AsyncProcess)
 def kill(patch, self):
     """Implement our own killing mechanism on certain platforms."""
 
-    # when running the build process using MSYS2 and bash we can't just kill
-    # the cmd.exe because this would leave most of the child processes running
+    # when running the build process using MSYS2 and bash we can't just kill the
+    # cmd.exe because this would leave the child processes running
     if sys.platform == "win32":
         if not self.killed:
-            self.killed = True
-            self.listener = None
-
-            # run a wmic command to find the children of this cmd.exe process
-            wmic_command = [
-                'wmic',
-                'process',
-                'where',
-                '(ParentProcessId=%d)' % self.proc.pid,
-                'get',
-                'Caption,ProcessId'
-            ]
-
-            cmd_children = subprocess.check_output(wmic_command,
-                                                   shell=True,
-                                                   universal_newlines=True)
-
-            # split the text output into process names and ids
-            cmd_children = [p.split() for p in cmd_children.splitlines() if p]
-
-            # search for the root bash process id
+            # search for a process id of bash
+            cmd_children = _get_windows_process_children(self.proc.pid)
             bash_pid = -1
-            for children in cmd_children:
-                if children[0].startswith("bash"):
-                    bash_pid = int(children[1])
+            for caption, pid in cmd_children:
+                if caption.startswith("bash"):
+                    bash_pid = int(pid)
 
-            # if a bash instance was found kill it and all its children
+            # if a bash instance was found, search for its children and kill
+            # them from within MSYS2 to correctly terminate all children
             if bash_pid != -1:
-                # We assume that the PID is the same as the PGID because bash
-                # is the root process. exit 0 is used because sometimes kill
-                # returns an error code of 1 and states "No such process" even
-                # though it has killed the processes.
-                kill_command = [
-                    'bash',
-                    '-c',
-                    'kill -- -%d; exit 0' % bash_pid
-                ]
+                bash_children = _get_windows_process_children(bash_pid)
+                for caption, pid in bash_children:
+                    _kill_msys2_process(int(pid))
 
-                subprocess.check_output(kill_command, shell=True)
-    else:  # not windows
-        # call the original method
-        original_kill(self)
+    # call the original method
+    patch.original(self)
 
 
 @patch(Default.exec.ExecCommand)
