@@ -36,10 +36,11 @@ class LinterEventListener(sublime_plugin.EventListener):
         """Listen to window commands and possibly rewrite them."""
 
         # prevent the panel to be shown automatically when a build is currently
-        # running
+        # running or the build panel is visible
         if command_name == "show_panel":
             linter_panel = "output.SublimeLinter"
             if args.get('panel') == linter_panel:
-                if is_building(window):
+                if (is_building(window) or
+                        window.active_panel() == "output.exec"):
                     # rewrite the command to a non-existing one to cancel it
                     return ("do_nothing")
